@@ -1,0 +1,2 @@
+# mosdnsconfigdeep
+deepseek生成的配置mosdns
