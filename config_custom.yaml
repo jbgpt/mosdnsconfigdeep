@@ -1,1 +1,91 @@
+# mosdns 配置文件 - 分流/广告拦截/流媒体加速
+# 作者：根据用户需求生成
 
+plugins:
+  # ========== 规则列表插件 ==========
+  # 国内域名列表（geosite:cn 或其他来源）
+  - tag: cn_domains
+    type: local_dns
+    args:
+      files:
+        - /etc/mosdns/rules/geosite-cn.txt  # 国内域名列表文件
+      # 仅用于匹配，无需返回响应
+
+  # 广告拦截规则列表（StevenBlack 列表）
+  - tag: ad_block
+    type: local_dns
+    args:
+      files:
+        - /etc/mosdns/rules/adblock.txt
+      response: "0.0.0.0"  # 命中广告规则返回空 IP
+
+  # 流媒体域名列表（Netflix/YouTube 等）
+  - tag: streaming_domains
+    type: local_dns
+    args:
+      files:
+        - /etc/mosdns/rules/streaming.txt
+
+  # ========== DNS 服务器插件 ==========
+  # 国内 DNS（114DNS）
+  - tag: china_dns
+    type: forward
+    args:
+      upstreams:
+        - addr: "udp://114.114.114.114:53"
+
+  # 国外默认 DNS（OpenDNS + Google）
+  - tag: foreign_dns
+    type: forward
+    args:
+      upstreams:
+        - addr: "udp://208.67.222.222:53"  # OpenDNS
+        - addr: "tls://8.8.8.8:853"         # Google DoT
+      enable_pipeline: true  # 并发查询
+
+  # 流媒体加速 DNS（如第三方优化 DNS）
+  - tag: streaming_dns
+    type: forward
+    args:
+      upstreams:
+        - addr: "tls://185.222.222.222:853"  # 示例：Snopyta DNS
+        - addr: "https://dns.cloudflare.com/dns-query"  # Cloudflare DoH
+
+  # ========== 其他功能插件 ==========
+  # DNS 缓存
+  - tag: dns_cache
+    type: cache
+    args:
+      size: 10000
+      ttl: 3600
+
+  # 日志记录（可选）
+  - tag: log_all
+    type: metadata
+    args:
+      log: true
+
+# ========== 规则链 ==========
+sequences:
+  - exec:
+      # 1. 先检查广告拦截
+      - if: "query in ad_block"
+        goto: ad_block
+
+      # 2. 检查流媒体域名
+      - if: "query in streaming_domains"
+        forward: streaming_dns
+        cache: dns_cache
+        jump: end  # 直接结束处理
+
+      # 3. 国内域名走国内 DNS
+      - if: "query in cn_domains"
+        forward: china_dns
+        cache: dns_cache
+
+      # 4. 其他域名走国外 DNS
+      - forward: foreign_dns
+        cache: dns_cache
+
+      # 结束标记
+      - tag: end
