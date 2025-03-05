@@ -5,7 +5,8 @@ chmod +x /etc/mosdns/update-rules.sh
 
 # 添加 crontab 任务
 (crontab -l ; echo "0 3 * * * /etc/mosdns/update-rules.sh") | crontab -
-4. 配置文件说明**
+
+# 4. 配置文件说明**
 
 #### **功能分解**：
 1. **广告拦截**：  
